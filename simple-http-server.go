@@ -227,7 +227,9 @@ func sendResult(ctx *model.EventContext, fileSize int64, c *fiber.Ctx) error {
 			}
 		}
 		if cacheControl != "" {
-			fmt.Printf("[DEBUG] Setting cache control for %s --> %s\n", fileName, cacheControl)
+			if _debug {
+				fmt.Printf("[DEBUG] Setting cache control for %s --> %s\n", fileName, cacheControl)
+			}
 			c.Set("Cache-Control", cacheControl)
 		}
 	}
@@ -246,7 +248,9 @@ func sendResult(ctx *model.EventContext, fileSize int64, c *fiber.Ctx) error {
 	} else if v, ok := ctx.Result.(int); ok {
 		return c.SendStatus(v)
 	} else /* chan */ if v, ok := ctx.Result.(io.Reader); ok {
-		fmt.Printf("[DEBUG] Sending stream\n")
+		if _debug {
+			fmt.Printf("[DEBUG] Sending stream\n")
+		}
 		c.Set("Content-Type", mimeType)
 		return c.SendStream(v)
 	} else {
@@ -266,7 +270,9 @@ func convertHttpPathToFileLocation(basePath string, path string) string {
 	re = strings.ReplaceAll(re, "/*", "")
 
 	re = fmt.Sprintf("^%s/?", re)
-	fmt.Printf("[DEBUG] Regexp: %s\n", re)
+	if _debug {
+		fmt.Printf("[DEBUG] Regexp: %s\n", re)
+	}
 	path = regexp.MustCompile(re).ReplaceAllString(path, PHYSICAL_ASSET_PATH)
 
 	return path
@@ -278,7 +284,9 @@ func readFileBytes(ctx *model.EventContext, c *fiber.Ctx, fileLocation string) (
 	var fileSize int64
 	if fileLocation == PHYSICAL_ASSET_PATH {
 		fileLocation = fmt.Sprintf("%sindex.html", PHYSICAL_ASSET_PATH)
-		fmt.Printf("New File location: %s\n", fileLocation)
+		if _debug {
+			fmt.Printf("New File location: %s\n", fileLocation)
+		}
 	} else {
 		// remove trailing slash
 		cleanFileLocation := regexp.MustCompile(`/$`).ReplaceAllString(fileLocation, "")
@@ -294,9 +302,13 @@ func readFileBytes(ctx *model.EventContext, c *fiber.Ctx, fileLocation string) (
 
 		if extension == "" {
 			fileLocation = fmt.Sprintf("%s/index.html", cleanFileLocation)
-			fmt.Printf("New File location: %s\n", fileLocation)
+			if _debug {
+				fmt.Printf("New File location: %s\n", fileLocation)
+			}
 		} else {
-			fmt.Printf("Extension: %s\n", extension)
+			if _debug {
+				fmt.Printf("Extension: %s\n", extension)
+			}
 		}
 	}
 	// if file not exists
@@ -305,7 +317,9 @@ func readFileBytes(ctx *model.EventContext, c *fiber.Ctx, fileLocation string) (
 		return nil, 0, err
 	}
 	fileSize = fStat.Size()
-	fmt.Printf("File size: %d\n", fileSize)
+	if _debug {
+		fmt.Printf("File size: %d\n", fileSize)
+	}
 	f, err := os.Open(fileLocation)
 	if err != nil {
 		return nil, fileSize, err
@@ -318,13 +332,17 @@ func readFileBytes(ctx *model.EventContext, c *fiber.Ctx, fileLocation string) (
 		if len(rangeHeaders) > 0 {
 			rangeHeader = rangeHeaders[0]
 		}
-		fmt.Printf("Range header: %s\n", rangeHeader)
+		if _debug {
+			fmt.Printf("Range header: %s\n", rangeHeader)
+		}
 
 		if rangeHeader != "" {
 			defer f.Close()
 			// Get the range values
 			rangeValues := strings.Split(rangeHeader, "=")[1]
-			fmt.Printf("Range values: %s\n", rangeValues)
+			if _debug {
+				fmt.Printf("Range values: %s\n", rangeValues)
+			}
 			// Get the start and end values
 			byteRanges := strings.Split(rangeValues, "-")
 
@@ -396,11 +414,16 @@ func readFileBytes(ctx *model.EventContext, c *fiber.Ctx, fileLocation string) (
 func SendStaticAsset(ctx *model.EventContext, c *fiber.Ctx) error {
 	basePath := ctx.Data.GetString("base_path")
 	path := ctx.Data.GetString("path")
-	fmt.Printf("Path: %s\n", path)
-	fmt.Printf("Base path: %s\n", basePath)
+	if _debug {
+		fmt.Printf("Path: %s\n", path)
+		fmt.Printf("Base path: %s\n", basePath)
+	}
 
 	fileLocation := convertHttpPathToFileLocation(basePath, path)
-	fmt.Printf("File location: %s\n", fileLocation)
+
+	if _debug {
+		fmt.Printf("File location: %s\n", fileLocation)
+	}
 	var fileContent interface{}
 	var err error
 	var fileSize int64
