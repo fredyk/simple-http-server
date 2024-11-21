@@ -18,18 +18,28 @@ import (
 )
 
 var PHYSICAL_ASSET_PATH = "./assets/dist/"
+var port = 8080
 
 type Options struct {
 	PhysicalAssetPath string
+	Port              int
 }
 
-func InitAndServe(options ...Options) {
+func InitAndServe(options ...Options) error {
 	if len(options) > 0 {
 		if options[0].PhysicalAssetPath != "" {
 			PHYSICAL_ASSET_PATH = options[0].PhysicalAssetPath
 		}
-	} else if os.Getenv("PHYSICAL_ASSET_PATH") != "" {
-		PHYSICAL_ASSET_PATH = os.Getenv("PHYSICAL_ASSET_PATH")
+		if options[0].Port > 0 {
+			port = options[0].Port
+		}
+	} else {
+		if os.Getenv("PHYSICAL_ASSET_PATH") != "" {
+			PHYSICAL_ASSET_PATH = os.Getenv("PHYSICAL_ASSET_PATH")
+		}
+		if os.Getenv("PORT") != "" {
+			port, _ = strconv.Atoi(os.Getenv("PORT"))
+		}
 	}
 	app := fiber.New()
 	app.Use(recover.New(recover.Config{
@@ -97,7 +107,7 @@ func InitAndServe(options ...Options) {
 		return sendResult(ctx, fileSize, c)
 	})
 
-	app.Listen(":8080")
+	return app.Listen(fmt.Sprintf(":%d", port))
 }
 
 func sendResult(ctx *model.EventContext, fileSize int64, c *fiber.Ctx) error {
