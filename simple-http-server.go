@@ -19,8 +19,16 @@ import (
 
 var PHYSICAL_ASSET_PATH = "./assets/dist/"
 
-func InitAndServe() {
-	if os.Getenv("PHYSICAL_ASSET_PATH") != "" {
+type Options struct {
+	PhysicalAssetPath string
+}
+
+func InitAndServe(options ...Options) {
+	if len(options) > 0 {
+		if options[0].PhysicalAssetPath != "" {
+			PHYSICAL_ASSET_PATH = options[0].PhysicalAssetPath
+		}
+	} else if os.Getenv("PHYSICAL_ASSET_PATH") != "" {
 		PHYSICAL_ASSET_PATH = os.Getenv("PHYSICAL_ASSET_PATH")
 	}
 	app := fiber.New()
