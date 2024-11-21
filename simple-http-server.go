@@ -19,10 +19,12 @@ import (
 
 var PHYSICAL_ASSET_PATH = "./assets/dist/"
 var port = 8080
+var _debug = false
 
 type Options struct {
 	PhysicalAssetPath string
 	Port              int
+	Debug             bool
 }
 
 func InitAndServe(options ...Options) error {
@@ -33,6 +35,7 @@ func InitAndServe(options ...Options) error {
 		if options[0].Port > 0 {
 			port = options[0].Port
 		}
+		_debug = options[0].Debug
 	} else {
 		if os.Getenv("PHYSICAL_ASSET_PATH") != "" {
 			PHYSICAL_ASSET_PATH = os.Getenv("PHYSICAL_ASSET_PATH")
@@ -40,7 +43,15 @@ func InitAndServe(options ...Options) error {
 		if os.Getenv("PORT") != "" {
 			port, _ = strconv.Atoi(os.Getenv("PORT"))
 		}
+		if os.Getenv("DEBUG") == "true" || os.Getenv("DEBUG") == "1" {
+			_debug = true
+		}
 	}
+
+	if PHYSICAL_ASSET_PATH != "" && PHYSICAL_ASSET_PATH != "/" && PHYSICAL_ASSET_PATH != "." && !strings.HasSuffix(PHYSICAL_ASSET_PATH, "/") {
+		PHYSICAL_ASSET_PATH = fmt.Sprintf("%s/", PHYSICAL_ASSET_PATH)
+	}
+
 	app := fiber.New()
 	app.Use(recover.New(recover.Config{
 		StackTraceHandler: func(c *fiber.Ctx, err interface{}) {
