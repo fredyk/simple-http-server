@@ -52,7 +52,9 @@ func InitAndServe(options ...Options) error {
 		PHYSICAL_ASSET_PATH = fmt.Sprintf("%s/", PHYSICAL_ASSET_PATH)
 	}
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		DisableStartupMessage: !_debug,
+	})
 	app.Use(recover.New(recover.Config{
 		StackTraceHandler: func(c *fiber.Ctx, err interface{}) {
 			fmt.Printf("Error: %s\n", err)
