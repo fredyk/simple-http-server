@@ -3,6 +3,7 @@ package simple_http_server
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"math"
 	"os"
@@ -21,13 +22,21 @@ var PHYSICAL_ASSET_PATH = "./assets/dist/"
 var port = 8080
 var _debug = false
 
+type FS interface {
+	fs.FS
+	fs.ReadDirFS
+	fs.ReadFileFS
+}
+
 type Options struct {
 	PhysicalAssetPath string
 	Port              int
 	Debug             bool
+	Fs                FS
 }
 
 func InitAndServe(options ...Options) error {
+	var customFs FS
 	if len(options) > 0 {
 		if options[0].PhysicalAssetPath != "" {
 			PHYSICAL_ASSET_PATH = options[0].PhysicalAssetPath
@@ -36,6 +45,7 @@ func InitAndServe(options ...Options) error {
 			port = options[0].Port
 		}
 		_debug = options[0].Debug
+		customFs = options[0].Fs
 	} else {
 		if os.Getenv("PHYSICAL_ASSET_PATH") != "" {
 			PHYSICAL_ASSET_PATH = os.Getenv("PHYSICAL_ASSET_PATH")
@@ -86,7 +96,7 @@ func InitAndServe(options ...Options) error {
 				"base_path": "/",
 			},
 		}
-		err := SendStaticAsset(ctx, c)
+		err := SendStaticAsset(ctx, c, customFs)
 		fileSize := (*ctx.Ephemeral)["fileSize"].(int64)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -95,10 +105,10 @@ func InitAndServe(options ...Options) error {
 					ctx.Result = asset404
 				} else {
 					fileLocation := fmt.Sprintf("%s404.html", PHYSICAL_ASSET_PATH)
-					asset404, fileSize, err = readFileBytes(ctx, c, fileLocation)
+					asset404, fileSize, err = readFileBytes(ctx, c, fileLocation, customFs)
 					if err != nil {
 						fileLocation := fmt.Sprintf("%serrors/404.html", PHYSICAL_ASSET_PATH)
-						asset404, fileSize, err = readFileBytes(ctx, c, fileLocation)
+						asset404, fileSize, err = readFileBytes(ctx, c, fileLocation, customFs)
 						if err != nil {
 							fmt.Printf("Error reading 404.html: %s\n", err)
 							asset404 = []byte("404 Not Found")
@@ -280,7 +290,7 @@ func convertHttpPathToFileLocation(basePath string, path string) string {
 	return path
 }
 
-func readFileBytes(ctx *model.EventContext, c *fiber.Ctx, fileLocation string) (interface{}, int64, error) {
+func readFileBytes(ctx *model.EventContext, c *fiber.Ctx, fileLocation string, customFs FS) (interface{}, int64, error) {
 	var fileContent []byte
 	var baseName string
 	var fileSize int64
@@ -313,8 +323,7 @@ func readFileBytes(ctx *model.EventContext, c *fiber.Ctx, fileLocation string) (
 			}
 		}
 	}
-	// if file not exists
-	fStat, err := os.Stat(fileLocation)
+	f, fStat, err := openFile(fileLocation, customFs)
 	if os.IsNotExist(err) {
 		return nil, 0, err
 	}
@@ -322,7 +331,6 @@ func readFileBytes(ctx *model.EventContext, c *fiber.Ctx, fileLocation string) (
 	if _debug {
 		fmt.Printf("File size: %d\n", fileSize)
 	}
-	f, err := os.Open(fileLocation)
 	if err != nil {
 		return nil, fileSize, err
 	}
@@ -413,7 +421,24 @@ func readFileBytes(ctx *model.EventContext, c *fiber.Ctx, fileLocation string) (
 	return fileContent, fileSize, err
 }
 
-func SendStaticAsset(ctx *model.EventContext, c *fiber.Ctx) error {
+func openFile(fileLocation string, customFs FS) (*os.File, os.FileInfo, error) {
+	if customFs != nil {
+		file, err := customFs.Open(fileLocation)
+		if err != nil {
+			return nil, nil, err
+		}
+		fileInfo, err := file.Stat()
+		return nil, fileInfo, err
+	}
+	file, err := os.Open(fileLocation)
+	if err != nil {
+		return nil, nil, err
+	}
+	fileInfo, err := file.Stat()
+	return file, fileInfo, err
+}
+
+func SendStaticAsset(ctx *model.EventContext, c *fiber.Ctx, customFs FS) error {
 	basePath := ctx.Data.GetString("base_path")
 	path := ctx.Data.GetString("path")
 	if _debug {
@@ -429,7 +454,7 @@ func SendStaticAsset(ctx *model.EventContext, c *fiber.Ctx) error {
 	var fileContent interface{}
 	var err error
 	var fileSize int64
-	fileContent, fileSize, err = readFileBytes(ctx, c, fileLocation)
+	fileContent, fileSize, err = readFileBytes(ctx, c, fileLocation, customFs)
 	ctx.Ephemeral = &model.EphemeralData{"fileSize": fileSize}
 	if err != nil {
 		return err
