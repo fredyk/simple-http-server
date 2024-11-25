@@ -381,8 +381,15 @@ func readFileBytes(ctx *model.EventContext, c *fiber.Ctx, fileLocation string, c
 			c.Set(fiber.HeaderAcceptRanges, "bytes")                                             // Set Accept-Ranges
 			ctx.StatusCode = fiber.StatusPartialContent                                          // Set the status code to 206 (Partial Content)
 
+			f.Close()
+			nativeF, err := os.Open(fileLocation)
+			if err != nil {
+				log.Println("Error opening file:", err)
+				return nil, 0, c.Status(fiber.StatusInternalServerError).SendString("Internal Server Error")
+			}
+
 			// Read the file from the start to the end
-			_, err = f.Seek(start, 0)
+			_, err = nativeF.Seek(start, 0)
 			if err != nil {
 				log.Println("Error seeking file:", err)
 				return nil, 0, c.Status(fiber.StatusInternalServerError).SendString("Internal Server Error")
@@ -421,20 +428,20 @@ func readFileBytes(ctx *model.EventContext, c *fiber.Ctx, fileLocation string, c
 	return fileContent, fileSize, err
 }
 
-func openFile(fileLocation string, customFs FS) (*os.File, os.FileInfo, error) {
+func openFile(fileLocation string, customFs FS) (file fs.File, fileInfo os.FileInfo, err error) {
 	if customFs != nil {
-		file, err := customFs.Open(fileLocation)
+		file, err = customFs.Open(fileLocation)
 		if err != nil {
-			return nil, nil, err
+			return file, fileInfo, err
 		}
-		fileInfo, err := file.Stat()
-		return nil, fileInfo, err
+		fileInfo, err = file.Stat()
+		return file, fileInfo, err
 	}
-	file, err := os.Open(fileLocation)
+	file, err = os.Open(fileLocation)
 	if err != nil {
-		return nil, nil, err
+		return file, fileInfo, err
 	}
-	fileInfo, err := file.Stat()
+	fileInfo, err = file.Stat()
 	return file, fileInfo, err
 }
 
